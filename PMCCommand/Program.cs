@@ -118,7 +118,6 @@ namespace PMCCommand
             };
 
             SetDelegatesForDTE();
-
             Console.WriteLine("Activating VS");
             DTE.MainWindow.Activate();
 
@@ -161,11 +160,12 @@ namespace PMCCommand
         /// </summary>
         private static void SpinWait()
         {
-            Lock();
             while (continueExecution == 0)
             {
                 System.Threading.Thread.Sleep(500);
             }
+
+            Lock();
         }
 
         private static void Unlock()
