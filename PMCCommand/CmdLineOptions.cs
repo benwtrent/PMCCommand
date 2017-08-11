@@ -10,7 +10,7 @@ namespace PMCCommand
         [Option('n', "nugetcommand", Required = true, HelpText = "The NuGet package management console command to execute.")]
         public string NuGetCommand { get; set; }
 
-        [Option('p', "project", Required = true, HelpText = "The full path of the csproj in which to run the command.")]
+        [Option('p', "project", Required = true, HelpText = "The full path of the .csproj or .sln file in which to run the command.")]
         public string ProjectPath { get; set; }
 
         [Option('v', "vsversion", Required = false, HelpText = "The VisualStudio version for DTE interaction", DefaultValue = "14.0")]
