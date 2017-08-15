@@ -3,8 +3,8 @@
 namespace PMCCommand
 {
     using System;
+    using System.Globalization;
     using System.IO;
-    using System.Threading;
     using EnvDTE;
     using EnvDTE80;
 
@@ -16,16 +16,25 @@ namespace PMCCommand
     public class Program
     {
         private const string CmdNameForPMC = "View.PackageManagerConsole";
-        private static int projectStarted = 0;
-        private static int commandRan = 0;
         private static bool retry = true;
-        private static int continueExecution = 0;
+        private static ExecutionState state = ExecutionState.NOT_STARTED;
+        private static object stateMutex = new object();
+
+        private enum ExecutionState
+        {
+            NOT_STARTED,
+            VS_OPENED,
+            PROJECT_OPENED,
+            NUGET_OPENED
+        }
 
         private static string VSVersion { get; set; }
 
         private static string ProjectPath { get; set; }
 
         private static string NuGetCmd { get; set; }
+
+        private static bool Debug { get; set; }
 
         private static DTE DTE { get; set; }
 
@@ -58,6 +67,7 @@ namespace PMCCommand
             {
                 ProjectPath = options.ProjectPath;
                 NuGetCmd = options.NuGetCommand;
+                Debug = options.Debug;
 
                 if (string.IsNullOrWhiteSpace(NuGetCmd))
                 {
@@ -118,19 +128,15 @@ namespace PMCCommand
             };
 
             SetDelegatesForDTE();
-            Console.WriteLine("Activating VS");
             DTE.MainWindow.Activate();
 
-            SpinWait();
-            Console.WriteLine("Opening Project: " + ProjectPath);
+            SpinWait(ExecutionState.VS_OPENED);
             DTE.ExecuteCommand("File.OpenProject", ProjectPath);
 
-            SpinWait();
-            Console.WriteLine("Opening Nuget Package Management Console");
+            SpinWait(ExecutionState.PROJECT_OPENED);
             DTE.ExecuteCommand(CmdNameForPMC);
 
-            SpinWait();
-            Console.WriteLine("Executing NugetCommand: " + NuGetCmd);
+            SpinWait(ExecutionState.NUGET_OPENED);
             var cmd = string.Format("{0}; $error > {1} ; \"False\" > {2}", NuGetCmd, NuGetOutputFile, LockFile);
             DTE.ExecuteCommand(CmdNameForPMC, cmd);
 
@@ -156,26 +162,15 @@ namespace PMCCommand
         /// We need to insure that particular parts of the main STAThread do not continue until feed back of other actions is received
         /// Since we could potentially get a failure from the MessageFilter and a retry.
         /// So, using a Monitor would not work as potentially the `Pulse` would occur before the `Wait`
-        /// Hence, the use of a spin wait that will get locked and unlocked.
+        /// Hence, the use of a naive state machine
         /// </summary>
-        private static void SpinWait()
+        /// <param name="expectedState">The state desired necessary to continue.</param>
+        private static void SpinWait(ExecutionState expectedState)
         {
-            while (continueExecution == 0)
+            while (state < expectedState)
             {
-                System.Threading.Thread.Sleep(500);
+                System.Threading.Thread.Sleep(1000);
             }
-
-            Lock();
-        }
-
-        private static void Unlock()
-        {
-            continueExecution = 1;
-        }
-
-        private static void Lock()
-        {
-            continueExecution = 0;
         }
 
         /// <summary>
@@ -189,6 +184,7 @@ namespace PMCCommand
             {
                 DTE.Events.SolutionEvents.Opened += SolutionEvents_Opened;
                 DTE.Events.CommandEvents.AfterExecute += CommandEvents_AfterExecute;
+                DTE.Events.CommandEvents.BeforeExecute += CommandEvents_BeforeExecute;
             }
             catch (System.Runtime.InteropServices.COMException ex)
             {
@@ -202,31 +198,41 @@ namespace PMCCommand
             }
         }
 
+        private static void CommandEvents_BeforeExecute(string guid, int id, object customIn, object customOut, ref bool cancelDefault)
+        {
+            PrintDebugLog(string.Format("Command Sent: GUID: {0}; ID: {1}; CustomIn: {2}; CustomOut: {3}", guid, id, customIn, customOut));
+        }
+
         private static void CommandEvents_AfterExecute(string guid, int id, object customIn, object customOut)
         {
+            PrintDebugLog(string.Format("Command Executed: GUID: {0}; ID: {1}; CustomIn: {2}; CustomOut: {3}", guid, id, customIn, customOut));
+
             // This means that PMC has loaded and loaded its sources
             if (guid == GuidsAndIds.GuidNuGetConsoleCmdSet && id == GuidsAndIds.CmdidNuGetSources)
             {
-                var initial = 0;
-                if (Interlocked.CompareExchange(ref commandRan, 1, initial) == 0)
-                {
-                    Unlock();
-                }
+                TransitionState(ExecutionState.PROJECT_OPENED, ExecutionState.NUGET_OPENED);
             }
             else
             {
-                // The First command we receive means that VS is now up and communicating back to us
-                var initial = 0;
-                if (Interlocked.CompareExchange(ref projectStarted, 1, initial) == 0)
-                {
-                    Unlock();
-                }
+                TransitionState(ExecutionState.NOT_STARTED, ExecutionState.VS_OPENED);
             }
         }
 
         private static void SolutionEvents_Opened()
         {
-            Unlock();
+            TransitionState(ExecutionState.VS_OPENED, ExecutionState.PROJECT_OPENED);
+        }
+
+        private static void TransitionState(ExecutionState expectedOldState, ExecutionState newState)
+        {
+            lock (stateMutex)
+            {
+                if (state == expectedOldState)
+                {
+                    state = newState;
+                    PrintDebugLog(string.Format("Transitioned from {0} to {1}", expectedOldState, newState));
+                }
+            }
         }
 
         private static string GetValue(string key, string defaultValue)
@@ -255,6 +261,14 @@ namespace PMCCommand
             // We want to make sure that the devenv is killed when we quit();
             dte2.UserControl = false;
             return dte2.DTE;
+        }
+
+        private static void PrintDebugLog(string message)
+        {
+            if (Debug)
+            {
+                Console.WriteLine("{0}: {1}", DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss.ffff", CultureInfo.InvariantCulture), message);
+            }
         }
     }
 }
