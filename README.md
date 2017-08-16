@@ -10,6 +10,23 @@ For this to work, you need to make sure that you have VisualStudio installed on 
 Make sure that the full project path is used. The command interface for `DTE` does not like relative paths.
 
 ```
+PMCCommand 1.0.0
+
+  -n, --nugetcommand    Required. The NuGet package management console command
+                        to execute.
+
+  -p, --project         Required. The full path of the .csproj or .sln file in
+                        which to run the command.
+
+  -v, --vsversion       (Default: 14.0) The VisualStudio version for DTE
+                        interaction.
+
+  -d, --debug           (Default: False) Print debuging output to the console.
+
+  --help                Display this help screen.
+
+
+Example: 
 PMCCommand.exe --nugetcommand "Update-Package Newtonsoft.Json" --project "C:\Foo\Bar\foobar.csproj"
 ```
 ### Example error output
