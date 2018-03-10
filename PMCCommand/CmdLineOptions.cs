@@ -13,7 +13,7 @@ namespace PMCCommand
         [Option('p', "project", Required = true, HelpText = "The full path of the .csproj or .sln file in which to run the command.")]
         public string ProjectPath { get; set; }
 
-        [Option('v', "vsversion", Required = false, HelpText = "The VisualStudio version for DTE interaction.", DefaultValue = "14.0")]
+        [Option('v', "vsversion", Required = false, HelpText = "The VisualStudio version for DTE interaction.", DefaultValue = "15.0")]
         public string VisualStudioVersion { get; set; }
 
         [Option('d', "debug", Required = false, HelpText = "Print debuging output to the console.", DefaultValue = false)]

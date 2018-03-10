@@ -18,7 +18,7 @@ PMCCommand 1.0.0
   -p, --project         Required. The full path of the .csproj or .sln file in
                         which to run the command.
 
-  -v, --vsversion       (Default: 14.0) The VisualStudio version for DTE
+  -v, --vsversion       (Default: 15.0) The VisualStudio version for DTE
                         interaction.
 
   -d, --debug           (Default: False) Print debuging output to the console.
