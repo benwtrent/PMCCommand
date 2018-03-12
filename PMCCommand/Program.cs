@@ -79,7 +79,7 @@ namespace PMCCommand
                     throw new Exception("project parameter cannot be empty.");
                 }
 
-                VSVersion = "14.0";
+                VSVersion = "15.0";
 
                 if (!string.IsNullOrWhiteSpace(options.VisualStudioVersion))
                 {
